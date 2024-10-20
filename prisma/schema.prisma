@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PhoneNumber {
+  id            String          @id @default(cuid())
+  phoneNumber   String          @unique
+  password      String
+  createdOn     DateTime        @default(now())
+  active        Boolean         @default(true) // Already present
+  posts         Post[] // Relationship to posts
+  PhoneGroupUrl PhoneGroupUrl[]
+  PhoneAppRel   PhoneAppRel[]
+}
+
+model PostLog {
+  id        String   @id @default(cuid())
+  postId    String // ID of the post requested
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  requestIp String? // IP address of the client making the request
+  userId    String? // ID of the user making the request (optional)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+}
+
+model App {
+  id              String            @id @default(cuid())
+  appName         String
+  createdOn       DateTime          @default(now())
+  active          Boolean           @default(true)
+  products        Product[] // Relationship to products
+  contentSites    ContentSiteRel[] // Relationship with content
+  Post            Post[]
+  AppTopicKeyword AppTopicKeyword[]
+  PhoneAppRel     PhoneAppRel[]
+
+  @@unique([appName])
+}
+
+model Product {
+  id              String              @id @default(cuid())
+  productName     String
+  createdOn       DateTime            @default(now())
+  active          Boolean             @default(true)
+  contentProducts ContentProductRel[] // Relationship with content
+  posts           Post[] // Relationship to posts
+  App             App?                @relation(fields: [appId], references: [id])
+  appId           String?
+  User            User[]
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String
+  createdOn     DateTime  @default(now())
+  product       Product?  @relation(fields: [productId], references: [id])
+  productId     String?
+  accounts      Account[]
+  sessions      Session[]
+  posts         Post[] // Relationship to posts
+  PostLog       PostLog[]
+}
+
+model Content {
+  id              String              @id @default(cuid())
+  contentName     String
+  createdOn       DateTime            @default(now())
+  contentMedia    ContentMedia[] // Relationship to media
+  contentSites    ContentSiteRel[] // Relationship with social media sites
+  contentProducts ContentProductRel[] // Relationship with products
+  Post            Post[]
+}
+
+model ContentSiteRel {
+  id        String   @id @default(cuid())
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String
+  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  appId     String
+  createdOn DateTime @default(now())
+  active    Boolean  @default(true)
+}
+
+model ContentProductRel {
+  id        String   @id @default(cuid())
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  createdOn DateTime @default(now())
+  active    Boolean  @default(true)
+}
+
+model ContentMedia {
+  id        String   @id @default(cuid())
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String
+  mediaType String // Example: 'url', 'text', 'image', 'video'
+  createdOn DateTime @default(now())
+  order     Int?
+  mediaUrl  String?
+  post      Post?    @relation(fields: [postId], references: [id]) // Linked to Post, if applicable
+  postId    String?
+}
+
+model Post {
+  id            String         @id @default(cuid())
+  phoneNumber   PhoneNumber    @relation(fields: [phoneNumberId], references: [id], onDelete: Cascade)
+  phoneNumberId String
+  content       Content        @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId     String
+  product       Product?       @relation(fields: [productId], references: [id])
+  productId     String?
+  app           App?           @relation(fields: [appId], references: [id])
+  appId         String?
+  status        Boolean        @default(false) // Indicates post success
+  failReason    String?
+  createdOn     DateTime       @default(now())
+  User          User?          @relation(fields: [userId], references: [id])
+  userId        String?
+  ContentMedia  ContentMedia[]
+  PostLog       PostLog[]
+}
+
+model PhoneGroupUrl {
+  id           String      @id @default(cuid())
+  phoneGroup   PhoneNumber @relation(fields: [phoneGroupId], references: [id], onDelete: Cascade)
+  phoneGroupId String
+  url          String
+  createdOn    DateTime    @default(now())
+  active       Boolean     @default(true)
+}
+
+model AppTopicKeyword {
+  id        String   @id @default(cuid())
+  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  appId     String
+  keyword   String
+  createdOn DateTime @default(now())
+}
+
+model PhoneAppRel {
+  id        String      @id @default(cuid())
+  phone     PhoneNumber @relation(fields: [phoneId], references: [id], onDelete: Cascade)
+  phoneId   String
+  app       App         @relation(fields: [appId], references: [id], onDelete: Cascade)
+  appId     String
+  createdOn DateTime    @default(now())
+}
+
+// Necessary for NextAuth (no changes here)
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String?
+  access_token             String?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_expires_in Int?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
